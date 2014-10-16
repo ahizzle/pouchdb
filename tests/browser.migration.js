@@ -801,6 +801,34 @@ describe('migration', function () {
             });
           });
         });
+
+        it('#2818 compaction of atts after many revs', function () {
+          var oldPouch = new dbs.first.pouch(
+            dbs.first.local, dbs.first.localOpts);
+
+          return oldPouch.put({_id: 'foo'}).then(function (res) {
+            return oldPouch.putAttachment('foo', 'att', res.rev, 'Zm9v',
+              'text/plain');
+          }).then(function () {
+            return oldPouch.get('foo', {attachments: true});
+          }).then(function (doc) {
+            doc._attachments['att'].content_type.should.equal('text/plain');
+            should.exist(doc._attachments['att'].data);
+            return oldPouch.get('foo');
+          }).then(function (doc) {
+            return oldPouch.put(doc);
+          }).then(function () {
+            var newPouch = new dbs.second.pouch(dbs.second.local,
+              {auto_compaction: false});
+            return newPouch.compact().then(function () {
+              return newPouch.get('foo', {attachments: true});
+            }).then(function (doc) {
+              doc._attachments['att'].content_type.should.equal('text/plain');
+              doc._attachments['att'].data.length.should.be.above(0,
+                'attachment exists');
+            });
+          });
+        });
       }
     });
   });
